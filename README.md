@@ -29,12 +29,16 @@ Install and enable login startup:
 
 ## What it shows
 
-The menu-bar title is a bar plus a percentage, e.g. `▰▰▰▱▱▱▱▱  38%`. The
-dropdown lists the newest sessions with their own context usage, and clicking
-one reveals the session file path. Refresh is every 2 seconds, and the read is
-incremental — only the tail of a session file is parsed once it has been seen.
+The menu-bar title is `CTX` plus a five-cell bar and a percentage, e.g.
+`CTX ▰▰▱▱▱ 38%`. The dropdown lists, for the newest session: context percent
+with used/window tokens, model, input and cached-input tokens, output tokens,
+the window size, when the record was written, and the session file name.
+`Refresh Now` (⌘R) and `Quit` (⌘Q) are at the bottom; refresh is otherwise
+every 2 seconds.
 
-Nothing leaves the machine: there is no network code in the binary.
+Only the last 512 KiB of a session file is read — the interesting record is the
+newest one, so the whole transcript is never parsed. Nothing leaves the
+machine: there is no network code in the binary.
 
 ## Requirements
 
