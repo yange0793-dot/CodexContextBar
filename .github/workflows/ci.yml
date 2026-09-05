@@ -1,0 +1,23 @@
+name: CI
+
+# One thing to check: that the single translation unit still compiles clean
+# against the SDK on a current runner. -Werror is deliberately not set — the
+# tree has known sign-compare warnings — but a hard error fails the build.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build the .app
+        run: ./build.sh
+      - name: The binary exists and is executable
+        run: test -x build/CodexContextBar.app/Contents/MacOS/CodexContextBar
