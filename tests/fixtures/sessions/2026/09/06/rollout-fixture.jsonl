@@ -1,0 +1,6 @@
+{"timestamp":"2026-09-06T01:00:00.000Z","type":"session_meta","payload":{"id":"fixture"}}
+{"timestamp":"2026-09-06T01:00:00.500Z","type":"turn_context","payload":{"model":"gpt-5.6-sol","cwd":"/tmp"}}
+{"timestamp":"2026-09-06T01:00:01.000Z","type":"event_msg","payload":{"type":"agent_message","message":"not a token_count record — must be ignored"}}
+{"timestamp":"2026-09-06T01:00:01.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":40800},"last_token_usage":{"input_tokens":40800,"cached_input_tokens":12000,"output_tokens":300},"model_context_window":272000}}}
+{"timestamp":"2026-09-06T01:00:02.500Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":68000},"last_token_usage":{"input_tokens":68000,"cached_input_tokens":25000,"output_tokens":900},"model_context_window":272000}}}
+this line is not JSON at all and must be skipped without crashing

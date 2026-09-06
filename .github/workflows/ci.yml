@@ -1,8 +1,9 @@
 name: CI
 
-# One thing to check: that the single translation unit still compiles clean
-# against the SDK on a current runner. -Werror is deliberately not set — the
-# tree has known sign-compare warnings — but a hard error fails the build.
+# Two things to check: that the single translation unit still compiles clean
+# against the SDK on a current runner, and that the reader produces the right
+# numbers for a fixture session (tests/run.sh). -Werror is deliberately not set
+# — the tree has known sign-compare warnings — but a hard error fails the build.
 on:
   push:
     branches: [main]
@@ -21,3 +22,5 @@ jobs:
         run: ./build.sh
       - name: The binary exists and is executable
         run: test -x build/CodexContextBar.app/Contents/MacOS/CodexContextBar
+      - name: Reader assertions against a fixture session
+        run: ./tests/run.sh

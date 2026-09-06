@@ -31,8 +31,22 @@ static NSTimeInterval const kRefreshInterval = 2.0;
 + (NSDate *)dateFromObject:(NSDictionary *)object {
     NSString *raw = object[@"timestamp"];
     if (![raw isKindOfClass:[NSString class]]) return nil;
-    NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
-    return [formatter dateFromString:raw];
+    // Codex writes millisecond precision ("...T03:04:32.457Z"), which the default
+    // NSISO8601DateFormatter options reject — it only accepts whole seconds. Parsing
+    // used to fail for every record, so all of them tied at distantPast and the
+    // FIRST token_count in a file won instead of the newest: the menu bar showed the
+    // context size from the start of the session and never moved. Try fractional
+    // seconds first, then plain, so both shapes parse.
+    static NSISO8601DateFormatter *withFraction = nil;
+    static NSISO8601DateFormatter *plain = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        withFraction = [[NSISO8601DateFormatter alloc] init];
+        withFraction.formatOptions = NSISO8601DateFormatWithInternetDateTime
+                                   | NSISO8601DateFormatWithFractionalSeconds;
+        plain = [[NSISO8601DateFormatter alloc] init];
+    });
+    return [withFraction dateFromString:raw] ?: [plain dateFromString:raw];
 }
 
 + (NSDictionary *)latestTokenInfoInFile:(NSURL *)url latestDate:(NSDate **)latestDate {
@@ -53,11 +67,24 @@ static NSTimeInterval const kRefreshInterval = 2.0;
 
         NSDictionary *bestInfo = nil;
         NSDate *bestDate = nil;
+        NSString *lastModel = nil;
         for (NSString *line in [text componentsSeparatedByString:@"\n"]) {
             if (line.length == 0) continue;
             NSData *lineData = [line dataUsingEncoding:NSUTF8StringEncoding];
             NSDictionary *event = [NSJSONSerialization JSONObjectWithData:lineData options:0 error:nil];
             if (![event isKindOfClass:[NSDictionary class]]) continue;
+
+            // The model name is not on the token_count record — its payload carries only
+            // {type, info, rate_limits}. Codex puts the model on turn_context (and a few
+            // other record types) as payload.model, so reading it off token_count meant
+            // the menu always fell back to the literal "Codex". Lines are in file order,
+            // so the last one seen is the model in effect.
+            NSDictionary *anyPayload = event[@"payload"];
+            if ([anyPayload isKindOfClass:[NSDictionary class]]) {
+                NSString *model = anyPayload[@"model"];
+                if ([model isKindOfClass:[NSString class]] && model.length > 0) lastModel = model;
+            }
+
             if (![event[@"type"] isEqual:@"event_msg"]) continue;
 
             NSDictionary *payload = event[@"payload"];
@@ -82,6 +109,11 @@ static NSTimeInterval const kRefreshInterval = 2.0;
         }
 
         if (latestDate) *latestDate = bestDate;
+        if (bestInfo && lastModel) {
+            NSMutableDictionary *withModel = [bestInfo mutableCopy];
+            withModel[@"model"] = lastModel;
+            bestInfo = withModel;
+        }
         return bestInfo;
     } @catch (__unused NSException *exception) {
         [handle closeFile];
@@ -89,9 +121,56 @@ static NSTimeInterval const kRefreshInterval = 2.0;
     }
 }
 
+// Only the tail of a session file is read, and Codex writes the model near the
+// START (session_meta is line 1; turn_context records follow early). Past ~512 KiB
+// of transcript there is no model in the tail at all, which is why long sessions
+// showed the literal "Codex". Read a small head chunk for the name only.
++ (NSString *)modelInHeadOfFile:(NSURL *)url {
+    NSFileHandle *handle = [NSFileHandle fileHandleForReadingAtPath:url.path];
+    if (!handle) return nil;
+    NSString *found = nil;
+    @try {
+        NSData *data = [handle readDataOfLength:64ULL * 1024ULL];
+        [handle closeFile];
+        NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        if (!text) return nil;
+        for (NSString *line in [text componentsSeparatedByString:@"\n"]) {
+            if (line.length == 0) continue;
+            NSDictionary *event = [NSJSONSerialization
+                JSONObjectWithData:[line dataUsingEncoding:NSUTF8StringEncoding]
+                           options:0 error:nil];
+            if (![event isKindOfClass:[NSDictionary class]]) continue;
+            NSDictionary *payload = event[@"payload"];
+            if (![payload isKindOfClass:[NSDictionary class]]) continue;
+            // turn_context and thread_settings_applied put it here;
+            // session_meta nests it under base_instructions.provenance.
+            id direct = payload[@"model"];
+            id nested = [[payload[@"base_instructions"] valueForKey:@"provenance"]
+                            valueForKey:@"model"];
+            for (id candidate in @[direct ?: [NSNull null], nested ?: [NSNull null]]) {
+                if ([candidate isKindOfClass:[NSString class]] &&
+                    [(NSString *)candidate length] > 0) found = candidate;
+            }
+        }
+    } @catch (__unused NSException *exception) {
+        [handle closeFile];
+        return nil;
+    }
+    return found;
+}
+
+// Overriding the sessions root is what makes the percentage testable: CI has no
+// real Codex history, so it points this at a fixture and asserts the exact number.
+// Unset in normal use, which is the only time the default path applies.
++ (NSString *)sessionsRoot {
+    NSString *override = NSProcessInfo.processInfo.environment[@"CODEX_CONTEXT_BAR_ROOT"];
+    if (override.length > 0) return override.stringByExpandingTildeInPath;
+    return [NSHomeDirectory() stringByAppendingPathComponent:@".codex/sessions"];
+}
+
 + (ContextSnapshot *)readSnapshot {
     ContextSnapshot *snapshot = [[ContextSnapshot alloc] init];
-    NSString *root = [NSHomeDirectory() stringByAppendingPathComponent:@".codex/sessions"];
+    NSString *root = [self sessionsRoot];
     NSFileManager *fm = [NSFileManager defaultManager];
     NSDirectoryEnumerator *enumerator = [fm enumeratorAtURL:[NSURL fileURLWithPath:root]
                                   includingPropertiesForKeys:@[
@@ -145,7 +224,10 @@ static NSTimeInterval const kRefreshInterval = 2.0;
     snapshot.cachedInputTokens = [self integerValue:last[@"cached_input_tokens"]];
     snapshot.outputTokens = [self integerValue:last[@"output_tokens"]];
     snapshot.contextWindow = [self integerValue:info[@"model_context_window"]];
-    snapshot.model = event[@"payload"][@"model"] ?: @"Codex";
+    snapshot.model = best[@"model"]
+                  ?: [self modelInHeadOfFile:bestURL]
+                  ?: event[@"payload"][@"model"]
+                  ?: @"Codex";
     snapshot.timestamp = bestDate;
     snapshot.sourcePath = bestURL.path;
     snapshot.hasData = snapshot.contextWindow > 0 && snapshot.inputTokens > 0;

@@ -40,6 +40,17 @@ Only the last 512 KiB of a session file is read — the interesting record is th
 newest one, so the whole transcript is never parsed. Nothing leaves the
 machine: there is no network code in the binary.
 
+## Tests
+
+```bash
+./build.sh && ./tests/run.sh
+```
+
+`tests/run.sh` points the reader at `tests/fixtures/sessions` via
+`CODEX_CONTEXT_BAR_ROOT` and asserts the exact percentage, the model name and
+that a malformed line does not abort the scan. That env var exists for this —
+unset in normal use, when `~/.codex/sessions` applies. CI runs it on every push.
+
 ## Requirements
 
 macOS 13 or newer (`-mmacosx-version-min=13.0`), Apple clang. No dependencies
