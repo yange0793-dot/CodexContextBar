@@ -11,6 +11,7 @@ clang -fobjc-arc \
   -Wall -Wextra \
   -framework Cocoa \
   -mmacosx-version-min=13.0 \
+  -arch x86_64 -arch arm64 \
   -o "$APP/Contents/MacOS/CodexContextBar" \
   main.m
 

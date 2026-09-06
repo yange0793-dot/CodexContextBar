@@ -179,6 +179,8 @@ static NSTimeInterval const kRefreshInterval = 2.0;
                                   ]
                                                      options:0
                                                 errorHandler:^BOOL(NSURL *url, NSError *error) {
+        (void)url;
+        (void)error;
         return YES;
     }];
 
@@ -252,7 +254,7 @@ static NSString *FormatDate(NSDate *date) {
 static NSString *ContextBar(NSInteger percent, NSUInteger width) {
     NSInteger filled = MAX(0, MIN((NSInteger)width, (NSInteger)llround((double)percent * width / 100.0)));
     NSMutableString *bar = [NSMutableString string];
-    for (NSUInteger i = 0; i < width; i++) [bar appendString:(i < filled ? @"▰" : @"▱")];
+    for (NSUInteger i = 0; i < (NSUInteger)width; i++) [bar appendString:(i < (NSUInteger)filled ? @"▰" : @"▱")];
     return bar;
 }
 
