@@ -1,5 +1,7 @@
 # Codex Context Bar
 
+[![CI](https://github.com/yange0793-dot/CodexContextBar/actions/workflows/ci.yml/badge.svg)](https://github.com/yange0793-dot/CodexContextBar/actions/workflows/ci.yml)
+
 Small native macOS menu-bar monitor for the current Codex context window.
 
 It reads only:
