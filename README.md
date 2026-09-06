@@ -54,7 +54,7 @@ unset in normal use, when `~/.codex/sessions` applies. CI runs it on every push.
 ## Requirements
 
 macOS 13 or newer (`-mmacosx-version-min=13.0`), Apple clang. No dependencies
-beyond Cocoa — the whole program is one 306-line `main.m` built by a 30-line
+beyond Cocoa — the whole program is one 388-line `main.m` built by a 30-line
 `build.sh`.
 
 ## Licence
